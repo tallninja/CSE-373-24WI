@@ -1,22 +1,31 @@
 package maps;
 
-import java.util.AbstractMap.SimpleEntry;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+/**
+ * @see AbstractIterableMap
+ * @see Map
+ */
 public class ArrayMap<K, V> extends AbstractIterableMap<K, V> {
-    private static final int DEFAULT_INITIAL_CAPACITY = 10;
+    private static final int DEFAULT_INITIAL_CAPACITY = 8;
+   
     SimpleEntry<K, V>[] entries;
+
+    private int size;
 
     public ArrayMap() {
         this(DEFAULT_INITIAL_CAPACITY);
     }
 
     public ArrayMap(int initialCapacity) {
-        this.entries = this.createArrayOfEntries(Math.max(1, initialCapacity));
+        if (initialCapacity < 1) {
+            throw new IllegalArgumentException();
+        }
+        this.entries = this.createArrayOfEntries(initialCapacity);
+        size = 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -26,37 +35,42 @@ public class ArrayMap<K, V> extends AbstractIterableMap<K, V> {
 
     @Override
     public V get(Object key) {
-        for (SimpleEntry<K, V> entry : entries) {
-            if (entry != null && Objects.equals(entry.getKey(), key)) {
-                return entry.getValue();
-            }
+        for (int i = 0; i < size; i++) {
+                if (Objects.equals(entries[i].getKey(), key)) {
+                    return entries[i].getValue();
+                }
         }
         return null;
     }
 
     @Override
     public V put(K key, V value) {
-        for (int i = 0; i < entries.length; i++) {
-            if (entries[i] != null && Objects.equals(entries[i].getKey(), key)) {
-                V oldValue = entries[i].getValue();
-                entries[i].setValue(value);
-                return oldValue;
-            }
+        if (size == entries.length) {
+            SimpleEntry<K, V>[] newEntries = this.createArrayOfEntries(entries.length * 2);
+            System.arraycopy(entries, 0, newEntries, 0, entries.length);
+            entries = newEntries;
         }
 
-        ensureCapacity();
-        entries[size()] = new SimpleEntry<>(key, value);
+        for (int i = 0; i < size; i++) {
+            if (Objects.equals(entries[i].getKey(), key)) {
+                V ret = entries[i].getValue();
+                entries[i] = new SimpleEntry<>(key, value);
+                return ret;
+            }
+        }
+        entries[size] = new SimpleEntry<>(key, value);
+        size++;
         return null;
     }
 
     @Override
     public V remove(Object key) {
-        for (int i = 0; i < entries.length; i++) {
-            if (entries[i] != null && Objects.equals(entries[i].getKey(), key)) {
-                V oldValue = entries[i].getValue();
-                entries[i] = entries[size() - 1];
-                entries[size() - 1] = null;
-                return oldValue;
+        for (int i = 0; i < size; i++) {
+            if (Objects.equals(entries[i].getKey(), key)) {
+                V ret = entries[i].getValue();
+                entries[i] = entries[size - 1];
+                size--;
+                return ret;
             }
         }
         return null;
@@ -64,13 +78,14 @@ public class ArrayMap<K, V> extends AbstractIterableMap<K, V> {
 
     @Override
     public void clear() {
-        Arrays.fill(entries, null);
+        size = 0;
+        this.entries = this.createArrayOfEntries(entries.length);
     }
 
     @Override
     public boolean containsKey(Object key) {
-        for (SimpleEntry<K, V> entry : entries) {
-            if (entry != null && Objects.equals(entry.getKey(), key)) {
+        for (int i = 0; i < size; i++) {
+            if (Objects.equals(entries[i].getKey(), key)) {
                 return true;
             }
         }
@@ -79,48 +94,39 @@ public class ArrayMap<K, V> extends AbstractIterableMap<K, V> {
 
     @Override
     public int size() {
-        int count = 0;
-        for (SimpleEntry<K, V> entry : entries) {
-            if (entry != null) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private void ensureCapacity() {
-        if (size() == entries.length) {
-            entries = Arrays.copyOf(entries, entries.length * 2);
-        }
+        return size;
     }
 
     @Override
     public Iterator<Map.Entry<K, V>> iterator() {
-        return new ArrayMapIterator<>(this.entries);
+        return new ArrayMapIterator<>(this.entries, size);
     }
+
 
     private static class ArrayMapIterator<K, V> implements Iterator<Map.Entry<K, V>> {
         private final SimpleEntry<K, V>[] entries;
-        private int currentIndex = 0;
+        private final int size;
+        private int curr;
+        // You may add more fields and constructor parameters
 
-        public ArrayMapIterator(SimpleEntry<K, V>[] entries) {
+        public ArrayMapIterator(SimpleEntry<K, V>[] entries, int size) {
             this.entries = entries;
+            this.size = size;
+            curr = 0;
         }
 
         @Override
         public boolean hasNext() {
-            while (currentIndex < entries.length && entries[currentIndex] == null) {
-                currentIndex++;
-            }
-            return currentIndex < entries.length;
+            return curr < size;
         }
 
         @Override
         public Map.Entry<K, V> next() {
-            if (!hasNext()) {
+            if (curr >= size) {
                 throw new NoSuchElementException();
             }
-            return entries[currentIndex++];
+            curr++;
+            return entries[curr - 1];
         }
     }
 }
